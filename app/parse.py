@@ -1,5 +1,8 @@
 import csv
 import dataclasses
+from datetime import time
+from urllib.parse import urljoin
+
 import requests
 from bs4 import BeautifulSoup, Tag
 
@@ -13,7 +16,7 @@ class Quote:
     tags: list[str]
 
 
-def parse_single_product(quote: Tag) -> Quote:
+def parse_single_quote(quote: Tag) -> Quote:
     return Quote(
         text=quote.select_one(".text").text,
         author=quote.select_one(".author").text,
@@ -27,11 +30,12 @@ def scrape_quotes() -> list[Quote]:
     while url:
         response = requests.get(url)
         response.raise_for_status()
+        time.sleep(0.3)
         soup = BeautifulSoup(response.text, "html.parser")
         for element in soup.select("div.quote"):
-            all_quotes.append(parse_single_product(element))
+            all_quotes.append(parse_single_quote(element))
         next_link = soup.select_one("li.next a")
-        url = BASE_URL + next_link["href"] if next_link else None
+        url = urljoin(BASE_URL, next_link["href"]) if next_link else None
     return all_quotes
 
 
