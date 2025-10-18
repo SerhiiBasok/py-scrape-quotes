@@ -1,7 +1,5 @@
 import csv
 import dataclasses
-from dataclasses import astuple, fields
-
 import requests
 from bs4 import BeautifulSoup, Tag
 
@@ -15,9 +13,6 @@ class Quote:
     tags: list[str]
 
 
-QUOTES_FIELDS = [field.name for field in fields(Quote)]
-
-
 def parse_single_product(quote: Tag) -> Quote:
     return Quote(
         text=quote.select_one(".text").text,
@@ -26,49 +21,30 @@ def parse_single_product(quote: Tag) -> Quote:
     )
 
 
-def get_next_button(soup: BeautifulSoup) -> str | None:
-    next_btn = soup.select_one(".next a")
-    if next_btn and next_btn.has_attr("href"):
-        return BASE_URL + next_btn["href"]
-    return None
-
-
-def get_num_pages(url: BASE_URL) -> int:
-    count = 0
+def scrape_quotes() -> list[Quote]:
+    all_quotes = []
+    url = BASE_URL
     while url:
         response = requests.get(url)
+        response.raise_for_status()
         soup = BeautifulSoup(response.text, "html.parser")
-        count += 1
-        url = get_next_button(soup)
-    return count
-
-
-def get_single_page_quotes(page_soup: Tag) -> list[Quote]:
-    quotes = page_soup.select(".quote")
-    return [parse_single_product(quote) for quote in quotes]
-
-
-def get_page_quotes() -> list[Quote]:
-    text = requests.get(BASE_URL).content
-    first_page_soup = BeautifulSoup(text, "html.parser")
-    num_pages = get_num_pages(BASE_URL)
-    all_quotes = get_single_page_quotes(first_page_soup)
-    for page_num in range(2, num_pages + 1):
-        text = requests.get(BASE_URL, params={"page": page_num}).content
-        next_page_soup = BeautifulSoup(text, "html.parser")
-        all_quotes.extend(get_single_page_quotes(next_page_soup))
+        for element in soup.select("div.quote"):
+            all_quotes.append(parse_single_product(element))
+        next_link = soup.select_one("li.next a")
+        url = BASE_URL + next_link["href"] if next_link else None
     return all_quotes
 
 
-def write_quotes_to_csv(quotes: [Quote], path: str) -> None:
-    with open(path, "w") as f:
+def write_quotes_to_csv(quotes: list[Quote], output_csv_path: str) -> None:
+    with open(output_csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(QUOTES_FIELDS)
-        writer.writerows([astuple(quote) for quote in quotes])
+        writer.writerow(["text", "author", "tags"])
+        for quote in quotes:
+            writer.writerow([quote.text, quote.author, quote.tags])
 
 
-def main(path: str = "result.csv") -> None:
-    write_quotes_to_csv(get_page_quotes(), path)
+def main(output_csv_path: str = "result.csv") -> None:
+    write_quotes_to_csv(scrape_quotes(), output_csv_path)
 
 
 if __name__ == "__main__":
