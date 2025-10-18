@@ -1,6 +1,6 @@
 import csv
+import time
 import dataclasses
-from datetime import time
 from urllib.parse import urljoin
 
 import requests
